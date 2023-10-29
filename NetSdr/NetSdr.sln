@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetSdr.Client", "src\NetSdr.Client\NetSdr.Client.csproj", "{E3275A5E-9080-41BC-9459-CDAA45DA72A2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetSdr.Host", "src\NetSdr.Host\NetSdr.Host.csproj", "{FB111204-3691-42C4-9CE8-D615B5DDA5AE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{E3275A5E-9080-41BC-9459-CDAA45DA72A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E3275A5E-9080-41BC-9459-CDAA45DA72A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E3275A5E-9080-41BC-9459-CDAA45DA72A2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FB111204-3691-42C4-9CE8-D615B5DDA5AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FB111204-3691-42C4-9CE8-D615B5DDA5AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FB111204-3691-42C4-9CE8-D615B5DDA5AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FB111204-3691-42C4-9CE8-D615B5DDA5AE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
