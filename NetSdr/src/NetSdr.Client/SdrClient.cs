@@ -13,8 +13,11 @@ internal sealed class SdrClient : IClient {
     public string Frequency { get; } = "0";
 
     private TcpClient? _client;
+    private NetworkStream? _networkStream;
+    // To detect redundant Dispose calls
+    private bool _disposed;
     
-    public void Connect(ITarget target, int port = 50000) {
+    public async Task ConnectAsync(ITarget target, int port = 50000) {
         if (ConnectionState != ConnectionState.Undefined || _client != null) {
             return;
         }
@@ -22,7 +25,7 @@ internal sealed class SdrClient : IClient {
         _client = new TcpClient();
         ConnectionState = ConnectionState.Pending;
         
-        _client.Connect(target.Address, port);
+        await _client.ConnectAsync(target.Address, port);
         if (_client.Connected) {
             ConnectionState = ConnectionState.Connected;
         }
@@ -43,16 +46,15 @@ internal sealed class SdrClient : IClient {
     ///     Capture mode defined by CaptureMode enum: 0x00 (default)
     ///     FIFO samples (default): 0x00
     /// </summary>
+    /// <param name="captureMode"></param>
     /// <param name="dataChannelTypeSpecifier"></param>
     /// <param name="fifoSampleCount">Number of 4096 16-bit data samples to capture in FIFO mode</param>
-    /// <param name="captureMode"></param>
-    public void ReceiverOn(CaptureMode captureMode, byte dataChannelTypeSpecifier = 0x80, byte? fifoSampleCount = null) {
+    public async Task ReceiverOnAsync(CaptureMode captureMode, byte dataChannelTypeSpecifier = 0x80, byte? fifoSampleCount = null) {
         if (ConnectionState != ConnectionState.Connected) {
             return;
         }
 
-        var parameters = new List<byte>
-        {
+        var parameters = new List<byte> {
             dataChannelTypeSpecifier, 0x02, (byte)captureMode,
         };
         
@@ -67,7 +69,7 @@ internal sealed class SdrClient : IClient {
             new ControlItem(ControlItemCode.ReceiverState, parameters.ToArray()),
             new Header(MessageType.HostSetControlItem));
 
-        SendMessage(message);
+        await SendMessageAsync(message);
     }
 
     /// <summary>
@@ -80,7 +82,7 @@ internal sealed class SdrClient : IClient {
     ///     FIFO samples (default): 0x00
     ///     Capture mode (ignored, used default: 0x00)
     /// </summary>
-    public void ReceiverOff() {
+    public async Task ReceiverOffAsync() {
         if (ConnectionState != ConnectionState.Connected) {
             return;
         }
@@ -89,7 +91,7 @@ internal sealed class SdrClient : IClient {
             new ControlItem(ControlItemCode.ReceiverState, new byte[] { 0x00, 0x01, 0x00, 0x00 }),
             new Header(MessageType.HostSetControlItem));
 
-        SendMessage(message);
+        await SendMessageAsync(message);
     }
 
     public void SetFrequency(int frequency) {
@@ -100,15 +102,52 @@ internal sealed class SdrClient : IClient {
         throw new NotImplementedException();
     }
     
-    
-    private void SendMessage(IMessage message) {
-        using var networkStream = _client!.GetStream();
-        var writer = new BinaryWriter(networkStream);
-        writer.Write(message.GetBytes()); 
-        writer.Flush();
+    private async Task SendMessageAsync(IMessage message) {
+        _networkStream ??= _client!.GetStream();
+        await _networkStream.WriteAsync( (Memory<byte>)message.GetBytes());
+        await _networkStream.FlushAsync();
     }
     
     public void Dispose() {
+        Dispose(true);
+
+        // Suppress finalization to prevent the finalizer from running
+        GC.SuppressFinalize(this);
+    }
+    
+    /// <summary>
+    /// Protected Dispose method that does the actual work of releasing resources
+    /// </summary>
+    /// <param name="disposing"></param>
+    private void Dispose(bool disposing) {
+        if (_disposed) return;
+
+        if (disposing) {
+            _networkStream?.Dispose();
+            _client?.Dispose();
+        }
+        
+        _disposed = true;
+    }
+    
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_networkStream != null)
+        {
+            await _networkStream.DisposeAsync();
+            _networkStream = null;
+        }
+
         _client?.Dispose();
+
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Destructor (Finalizer)
+    /// </summary>
+    ~SdrClient() {
+        Dispose(false);
     }
 }
