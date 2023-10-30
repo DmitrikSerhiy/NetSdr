@@ -4,6 +4,7 @@ using Helpers;
 using Interfaces;
 using Message;
 using Message.Item;
+using System.Net.Sockets;
 
 /// <summary>
 /// Implementation of the NetSDR protocol
@@ -12,12 +13,19 @@ public sealed class SdrClient : IClient {
     public ConnectionState ConnectionState { get; private set; } = ConnectionState.Undefined;
 
     private readonly TcpClientAdapter _client;
+    
+    private UdpClient? _udpClient;
+    private ushort _sequenceNumber = 0;
+
+    private readonly IHost _host;
+
     private Stream? _networkStream;
     // To detect redundant Dispose calls
     private bool _disposed;
 
-    public SdrClient(TcpClientAdapter client) {
+    public SdrClient(TcpClientAdapter client, IHost host) {
         _client = client ?? throw new ArgumentNullException(nameof(client));
+        _host = host ?? throw new ArgumentNullException(nameof(host));
     }
     
     public async Task ConnectAsync(ITarget target, int port = 50000) {
@@ -34,6 +42,7 @@ public sealed class SdrClient : IClient {
     
     public void Disconnect() {
         _client.Close();
+        _udpClient?.Close();
         ConnectionState = ConnectionState.Disconnected;
     }
 
@@ -66,11 +75,15 @@ public sealed class SdrClient : IClient {
             parameters.Add(0x00);
         }
         
-        var message = new RequestMessage(
+        var message = new Message.Message(
             new ControlItem(ControlItemCode.ReceiverState, parameters.ToArray()),
             new Header(MessageType.HostSetControlItem));
 
+        // Part two: send UDP message back to the host
         await SendMessageAsync(message);
+        OpenUdpSocketAsync();
+        await SendDataToHostAsync(GetHelloWorldMessage(_sequenceNumber)); // don't know what to send. It's not clear neither from documentation nor from the task description 
+        _sequenceNumber = (ushort)((_sequenceNumber + 1) & 0xFFFF);
     }
 
     /// <summary>
@@ -88,11 +101,12 @@ public sealed class SdrClient : IClient {
             return;
         }
         
-        var message = new RequestMessage(
+        var message = new Message.Message(
             new ControlItem(ControlItemCode.ReceiverState, new byte[] { 0x00, 0x01, 0x00, 0x00 }),
             new Header(MessageType.HostSetControlItem));
 
         await SendMessageAsync(message);
+        _udpClient?.Close();
     }
 
     /// <summary>
@@ -118,7 +132,7 @@ public sealed class SdrClient : IClient {
         };
         parameters.AddRange(frequencyBytes);
 
-        var message = new RequestMessage(
+        var message = new Message.Message(
             new ControlItem(ControlItemCode.ReceiverFrequency, parameters.ToArray()),
             new Header(MessageType.HostSetControlItem));
 
@@ -130,10 +144,32 @@ public sealed class SdrClient : IClient {
         if (_networkStream is null) {
             return;
         }
-        await _networkStream.WriteAsync( (Memory<byte>)message.GetBytes());
+        await _networkStream.WriteAsync( (Memory<byte>)message.GetBytesForControlItemMessage());
         await _networkStream.FlushAsync();
     }
     
+    private void OpenUdpSocketAsync()
+    {
+        _udpClient ??= new UdpClient();
+        _udpClient.Connect(_host.Address, 60000);
+    }
+
+    public async Task SendDataToHostAsync(byte[] data) {
+        if (_udpClient is null) {
+            return;
+        }
+
+        await _udpClient.SendAsync(data);
+    }
+
+    private byte[] GetHelloWorldMessage(ushort sequenceNumber) {
+        var helloWorld = "Hello World!"u8.ToArray();
+        var message = new DataMessage(new DataItem(DataItemType.IQIFData, helloWorld), null);
+        return message.GetBytesForDataItemMessage(sequenceNumber);
+    }
+
+    #region Dispose
+
     public void Dispose() {
         Dispose(true);
 
@@ -151,6 +187,7 @@ public sealed class SdrClient : IClient {
         if (disposing) {
             _networkStream?.Dispose();
             _client.Dispose();
+            _udpClient?.Dispose();
         }
         
         _disposed = true;
@@ -166,6 +203,7 @@ public sealed class SdrClient : IClient {
         }
 
         _client.Dispose();
+        _udpClient?.Dispose();
 
         GC.SuppressFinalize(this);
     }
@@ -176,4 +214,6 @@ public sealed class SdrClient : IClient {
     ~SdrClient() {
         Dispose(false);
     }
+    
+    #endregion
 }

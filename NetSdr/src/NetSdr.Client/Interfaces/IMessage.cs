@@ -8,5 +8,5 @@ using Message;
 /// </summary>
 public interface IMessage { 
     IMessageItem Item { get; init; }
-    Header Header { get; init; }
+    Header? Header { get; init; }
 }

@@ -3,7 +3,6 @@
 using Interfaces;
 using Message.Item;
 
-
 public static class MessageExtensions {
     
     /// <summary>
@@ -21,7 +20,7 @@ public static class MessageExtensions {
     /// </summary>
     /// <param name="message"></param>
     /// <returns></returns>
-    public static byte[] GetBytes(this IMessage message) {
+    public static byte[] GetBytesForControlItemMessage(this IMessage message) {
 
         var byteList = new List<byte>();
 
@@ -30,7 +29,7 @@ public static class MessageExtensions {
         if (message.Item is DataItem && blockLength == 8192) // special case
             blockLength = 0;
 
-        var header = (ushort)((blockLength & 0xFF) | ((int)message.Header.MessageType << 8) | ((blockLength & 0x1F00) << 3));
+        var header = (ushort)((blockLength & 0xFF) | ((int)message.Header!.MessageType << 8) | ((blockLength & 0x1F00) << 3));
         byteList.Add((byte)(header & 0xFF)); // lsb
         byteList.Add((byte)((header >> 8) & 0xFF)); // msb
 
@@ -47,6 +46,29 @@ public static class MessageExtensions {
         }
 
         return byteList.ToArray();
+    }
+    
+    public static byte[] GetBytesForDataItemMessage(this IMessage message, ushort sequenceNumber) {
+        if (message.Item is not DataItem dataMessage) {
+            return Array.Empty<byte>();
+        }
+
+        const int dataSize = 1024;  // 512 16bit data samples
+        var output = new byte[6 + dataSize];  // 6 bytes for headers
+
+        output[0] = 0x04;
+        output[1] = 0x84;
+        output[2] = (byte)(sequenceNumber & 0xFF);        // Lower byte of sequence number
+        output[3] = (byte)((sequenceNumber >> 8) & 0xFF); // Upper byte of sequence number
+        output[4] = 0x04;
+
+        if (dataMessage.Data.Length > dataSize) {
+            return Array.Empty<byte>();
+        }
+
+        Array.Copy(dataMessage.Data, 0, output, 5, dataMessage.Data.Length);
+
+        return output;
     }
     
     private static int CalculateBlockLength(IMessage message)

@@ -8,4 +8,4 @@ using Interfaces.Message;
 /// </summary>
 /// <param name="Item"></param>
 /// <param name="Header"></param>
-public sealed record RequestMessage(IMessageItem Item, Header Header) : IMessage;
+public sealed record DataMessage (IMessageItem Item, Header? Header) : IMessage;
