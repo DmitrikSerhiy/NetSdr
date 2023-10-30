@@ -17,8 +17,8 @@ public sealed class TcpClientTests {
 
     public TcpClientTests() {
         _mockTcpAdapter = new Mock<TcpClientAdapter>();
-        Mock<SdrHost> mockSdrHost = new();
-        _sdrClient = new SdrClient(_mockTcpAdapter.Object, mockSdrHost.Object);
+        var host = new SdrHost(); // host is not covered by unit tests
+        _sdrClient = new SdrClient(_mockTcpAdapter.Object, host);
     }
     
     

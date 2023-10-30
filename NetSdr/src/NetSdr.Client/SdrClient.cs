@@ -35,6 +35,7 @@ public sealed class SdrClient : IClient {
         
         ConnectionState = ConnectionState.Pending;
         await _client.ConnectAsync(target.Address, port);
+
         ConnectionState = _client.Connected 
             ? ConnectionState.Connected 
             : ConnectionState.Undefined;
@@ -78,12 +79,14 @@ public sealed class SdrClient : IClient {
         var message = new Message.Message(
             new ControlItem(ControlItemCode.ReceiverState, parameters.ToArray()),
             new Header(MessageType.HostSetControlItem));
+        
+        await SendMessageAsync(message);
 
         // Part two: send UDP message back to the host
-        await SendMessageAsync(message);
-        OpenUdpSocketAsync();
-        await SendDataToHostAsync(GetHelloWorldMessage(_sequenceNumber)); // don't know what to send. It's not clear neither from documentation nor from the task description 
-        _sequenceNumber = (ushort)((_sequenceNumber + 1) & 0xFFFF);
+        // uncomment if real data and real host is available
+        // OpenUdpSocketAsync();
+        // await SendDataToHostAsync(GetHelloWorldMessage(_sequenceNumber)); // don't know what to send. It's not clear neither from documentation nor from the task description 
+        // _sequenceNumber = (ushort)((_sequenceNumber + 1) & 0xFFFF);
     }
 
     /// <summary>
