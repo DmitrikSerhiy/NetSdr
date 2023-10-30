@@ -4,33 +4,36 @@ using Helpers;
 using Interfaces;
 using Message;
 using Message.Item;
-using System.Net.Sockets;
 
-
-internal sealed class SdrClient : IClient {
+/// <summary>
+/// Implementation of the NetSDR protocol
+/// </summary>
+public sealed class SdrClient : IClient {
     public ConnectionState ConnectionState { get; private set; } = ConnectionState.Undefined;
 
-    private TcpClient? _client;
-    private NetworkStream? _networkStream;
+    private readonly TcpClientAdapter _client;
+    private Stream? _networkStream;
     // To detect redundant Dispose calls
     private bool _disposed;
+
+    public SdrClient(TcpClientAdapter client) {
+        _client = client ?? throw new ArgumentNullException(nameof(client));
+    }
     
     public async Task ConnectAsync(ITarget target, int port = 50000) {
-        if (ConnectionState != ConnectionState.Undefined || _client != null) {
+        if (ConnectionState != ConnectionState.Undefined) {
             return;
         }
         
-        _client = new TcpClient();
         ConnectionState = ConnectionState.Pending;
-        
         await _client.ConnectAsync(target.Address, port);
-        if (_client.Connected) {
-            ConnectionState = ConnectionState.Connected;
-        }
+        ConnectionState = _client.Connected 
+            ? ConnectionState.Connected 
+            : ConnectionState.Undefined;
     }
     
     public void Disconnect() {
-        _client?.Close();
+        _client.Close();
         ConnectionState = ConnectionState.Disconnected;
     }
 
@@ -123,7 +126,10 @@ internal sealed class SdrClient : IClient {
     }
     
     private async Task SendMessageAsync(IMessage message) {
-        _networkStream ??= _client!.GetStream();
+        _networkStream ??= _client.GetStream();
+        if (_networkStream is null) {
+            return;
+        }
         await _networkStream.WriteAsync( (Memory<byte>)message.GetBytes());
         await _networkStream.FlushAsync();
     }
@@ -144,7 +150,7 @@ internal sealed class SdrClient : IClient {
 
         if (disposing) {
             _networkStream?.Dispose();
-            _client?.Dispose();
+            _client.Dispose();
         }
         
         _disposed = true;
@@ -159,7 +165,7 @@ internal sealed class SdrClient : IClient {
             _networkStream = null;
         }
 
-        _client?.Dispose();
+        _client.Dispose();
 
         GC.SuppressFinalize(this);
     }
