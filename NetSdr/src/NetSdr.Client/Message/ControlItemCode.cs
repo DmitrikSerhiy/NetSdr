@@ -6,6 +6,6 @@ public enum ControlItemCode : ushort {
     InterfaceVersion = 0x0003,
     // ...
     ReceiverState = 0x0018,
-    ReceiverChannelSetup = 0x0019
+    ReceiverFrequency = 0x0020
     // ...
 }

@@ -8,9 +8,7 @@ using System.Net.Sockets;
 
 
 internal sealed class SdrClient : IClient {
-
     public ConnectionState ConnectionState { get; private set; } = ConnectionState.Undefined;
-    public string Frequency { get; } = "0";
 
     private TcpClient? _client;
     private NetworkStream? _networkStream;
@@ -94,12 +92,34 @@ internal sealed class SdrClient : IClient {
         await SendMessageAsync(message);
     }
 
-    public void SetFrequency(int frequency) {
+    /// <summary>
+    /// Set frequency for specified (or all) channel.
+    /// </summary>
+    /// <param name="frequencyInHz">Contains 5 bytes which represents the real frequency</param>
+    /// <param name="channelId">Channel to set or set all the same frequency(0xFF - default value)</param>
+    public async Task SetFrequencyAsync(ulong frequencyInHz, byte channelId = 0xFF) {
         if (ConnectionState != ConnectionState.Connected) {
             return;
         }
-        
-        throw new NotImplementedException();
+
+        // Convert frequency to 5-byte array
+        var frequencyBytes = new byte[5];
+        for (var i = 0; i < 5; i++) {
+            frequencyBytes[i] = (byte)(frequencyInHz & 0xFF);
+            frequencyInHz >>= 8;
+        }
+
+        var parameters = new List<byte>
+        {
+            channelId
+        };
+        parameters.AddRange(frequencyBytes);
+
+        var message = new RequestMessage(
+            new ControlItem(ControlItemCode.ReceiverFrequency, parameters.ToArray()),
+            new Header(MessageType.HostSetControlItem));
+
+        await SendMessageAsync(message);
     }
     
     private async Task SendMessageAsync(IMessage message) {
